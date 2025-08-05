@@ -1,55 +1,62 @@
 import streamlit as st
 import pandas as pd
 
-# Load product data
+# Load product data from Excel
 @st.cache_data
 def load_product_data():
-    df = pd.read_excel("VesmaVloer.Collection.Website.2025 (3).xlsx", sheet_name="Sheet1")
-    df = df[["Model", "Merk", "COMISSIE prijs /m2/m (ex. Btw)"]].dropna()
-    df.columns = ["Model", "Merk", "Prijs_per_m2"]
+    df = pd.read_excel("VesmaVloer.Collection.Website.2025 (3).xlsx")
+    df = df[["model", "merk", "COMISSIE prijs /m2/m (ex. btw)"]].dropna()
+    df.columns = ["Model", "Merk", "Prijs_per_m2"]  # Rename for consistency
     return df
 
 df_products = load_product_data()
 
-st.title("🧾 VesmaVloer Offerte Generator")
+st.title("🧾 Vesma Vloer Offerte Generator")
 
-# Customer details
-client_name = st.text_input("Naam van klant")
-project_name = st.text_input("Project naam / Referentie")
-date = st.date_input("Datum")
+st.header("1. Klantinformatie")
+klant_naam = st.text_input("Naam van de klant")
 
-# Product selection
-selected_model = st.selectbox("Kies een productmodel", df_products["Model"].unique())
-product_info = df_products[df_products["Model"] == selected_model].iloc[0]
-aantal_m2 = st.number_input("Aantal m²", min_value=1.0, step=0.5)
+st.header("2. Productkeuze")
+product_model = st.selectbox("Kies een laminaat product", df_products["Model"].unique())
 
-# Price calculation
+# Fetch product details
+product_info = df_products[df_products["Model"] == product_model].iloc[0]
 prijs_per_m2 = product_info["Prijs_per_m2"]
-totaal_prijs = round(prijs_per_m2 * aantal_m2, 2)
+merk = product_info["Merk"]
 
-# Display offerte summary
-st.subheader("📄 Offerte")
-st.write(f"**Klantnaam:** {client_name}")
-st.write(f"**Project:** {project_name}")
-st.write(f"**Datum:** {date}")
-st.write(f"**Product:** {selected_model} ({product_info['Merk']})")
-st.write(f"**Prijs per m² (excl. BTW):** € {prijs_per_m2}")
-st.write(f"**Aantal m²:** {aantal_m2}")
-st.write(f"**Totaalprijs (excl. BTW):** € {totaal_prijs}")
+st.markdown(f"**Merk:** {merk}")
+st.markdown(f"**Prijs per m²:** €{prijs_per_m2:.2f} (excl. BTW)")
 
-# Save offerte to Excel
-if st.button("💾 Genereer offerte (Excel)"):
+st.header("3. Oppervlakte")
+aantal_m2 = st.number_input("Hoeveel m² heeft de klant nodig?", min_value=1)
+
+totaal_prijs = prijs_per_m2 * aantal_m2
+btw = totaal_prijs * 0.21
+totaal_incl_btw = totaal_prijs + btw
+
+st.header("4. Offerte Overzicht")
+st.markdown(f"**Klant:** {klant_naam}")
+st.markdown(f"**Product:** {product_model}")
+st.markdown(f"**Merk:** {merk}")
+st.markdown(f"**Aantal m²:** {aantal_m2}")
+st.markdown(f"**Totaal (excl. BTW):** €{totaal_prijs:.2f}")
+st.markdown(f"**BTW (21%):** €{btw:.2f}")
+st.markdown(f"**Totaal (incl. BTW):** €{totaal_incl_btw:.2f}")
+
+# Optionally download as XLS
+if st.button("💾 Genereer XLS offerte"):
     offerte_df = pd.DataFrame({
-        "Klant": [client_name],
-        "Project": [project_name],
-        "Datum": [date],
-        "Product": [selected_model],
-        "Merk": [product_info["Merk"]],
-        "Prijs per m²": [prijs_per_m2],
+        "Klant": [klant_naam],
+        "Product": [product_model],
+        "Merk": [merk],
         "Aantal m²": [aantal_m2],
-        "Totaalprijs": [totaal_prijs]
+        "Prijs/m²": [prijs_per_m2],
+        "Totaal (excl. BTW)": [totaal_prijs],
+        "BTW (21%)": [btw],
+        "Totaal (incl. BTW)": [totaal_incl_btw]
     })
-    offerte_file = "offerte_output.xlsx"
-    offerte_df.to_excel(offerte_file, index=False)
-    with open(offerte_file, "rb") as f:
-        st.download_button("📥 Download offerte", f, file_name=offerte_file)
+
+    offerte_df.to_excel("offerte_output.xlsx", index=False)
+    with open("offerte_output.xlsx", "rb") as f:
+        st.download_button("📥 Download offerte als XLSX", f, file_name="Offerte-VesmaVloer.xlsx")
+
